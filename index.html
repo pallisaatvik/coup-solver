@@ -3,31 +3,220 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Coup Solver</title>
+  <title>Coup — 1v1 vs Bot</title>
   <style>
-    :root { color-scheme: light dark; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f1117;
+      color: #e8e8e8;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ---- Start screen ---- */
+    #start-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      text-align: center;
+      padding: 24px;
+    }
+    #start-screen h1 { font-size: 2rem; letter-spacing: 1px; }
+    #start-screen p  { color: #aaa; max-width: 420px; line-height: 1.6; }
+
+    #btn-new-game {
+      padding: 14px 36px;
+      font-size: 1.1rem;
+      background: #2ecc71;
+      color: #0f1117;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    #btn-new-game:hover { background: #27ae60; }
+
+    /* ---- Game screen ---- */
+    #game-screen {
+      display: none;
+      flex-direction: column;
+      width: 100%;
+      max-width: 640px;
+      min-height: 100dvh;
+      padding: 12px;
+      gap: 10px;
+    }
+
+    /* ---- Player areas ---- */
+    .player-area {
+      background: #1a1d2e;
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .player-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+    }
+    .player-name { font-size: 1rem; }
+    .player-coins {
+      font-size: 0.85rem;
+      color: #f1c40f;
+      background: #2c2a10;
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+    .player-cards {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .card-badge {
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #fff;
+      user-select: none;
+    }
+    .card-badge.revealed {
+      opacity: 0.4;
+      text-decoration: line-through;
+    }
+    .revealed-label {
+      font-size: 0.72rem;
+      color: #888;
+      margin-top: 2px;
+    }
+
+    /* ---- Center: log + prompt ---- */
+    #center {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0;
+    }
+
+    #game-log {
+      flex: 1;
+      overflow-y: auto;
+      background: #12141f;
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 0.8rem;
+      min-height: 120px;
+      max-height: 260px;
+    }
+    .log-entry { line-height: 1.4; }
+    .log-entry.player-0 { color: #74b9ff; }
+    .log-entry.player-1 { color: #fd9644; text-align: right; }
+
+    #phase-prompt {
+      text-align: center;
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 8px;
+      border-radius: 8px;
+      background: #1a1d2e;
+    }
+    #phase-prompt.win  { background: #1a3a1e; color: #2ecc71; }
+    #phase-prompt.lose { background: #3a1a1a; color: #e74c3c; }
+
+    /* ---- Action buttons ---- */
+    #action-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 4px 0 8px;
+    }
+
+    .action-btn {
+      padding: 9px 16px;
+      font-size: 0.85rem;
+      border: 1px solid #444;
+      border-radius: 8px;
+      background: #1e2235;
+      color: #e8e8e8;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.15s;
+    }
+    .action-btn:hover:not(:disabled) { background: #2a2f4a; border-color: #666; }
+    .action-btn:disabled { opacity: 0.4; cursor: default; }
+    .action-btn.reveal-btn { border-width: 2px; }
+
+    /* Exchange picker */
+    .card-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .card-checkbox input { cursor: pointer; }
+
+    #action-buttons p { width: 100%; text-align: center; font-size: 0.9rem; color: #aaa; }
   </style>
 </head>
 <body>
-  <h1>Coup Solver</h1>
-  <p>
-    Coup is a bluffing card game for 2–6 players. Each player holds two secret influence cards
-    and takes actions — some truthful, some bluffed — to eliminate opponents' cards. Last player
-    with influence wins.
-  </p>
-  <p>
-    This tool analyzes Coup game states: tracking probabilities, evaluating optimal actions,
-    and exposing when bluffs are likely to succeed or fail.
-  </p>
 
-  <h2>Character Reference</h2>
-  <img src="assets/coup-character-actions.jpg" alt="Coup character actions reference" style="max-width:100%; border-radius:6px; margin-top:12px; display:block;">
-  <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:12px;">
-    <img src="https://www.ultraboardgames.com/coup/gfx/coup1.jpg" alt="Duke" style="max-width:160px; border-radius:6px;">
-    <img src="https://www.ultraboardgames.com/coup/gfx/coup2.jpg" alt="Assassin" style="max-width:160px; border-radius:6px;">
-    <img src="https://www.ultraboardgames.com/coup/gfx/coup3.jpg" alt="Captain" style="max-width:160px; border-radius:6px;">
-    <img src="https://www.ultraboardgames.com/coup/gfx/coup4.jpg" alt="Ambassador" style="max-width:160px; border-radius:6px;">
-    <img src="https://www.ultraboardgames.com/coup/gfx/coup5.jpg" alt="Contessa" style="max-width:160px; border-radius:6px;">
+  <!-- Start screen -->
+  <div id="start-screen">
+    <h1>Coup</h1>
+    <p>1v1 against the bot. Bluff, challenge, and eliminate your opponent's influence to win.</p>
+    <button id="btn-new-game">New Game</button>
   </div>
+
+  <!-- Game screen -->
+  <div id="game-screen">
+
+    <!-- Bot area -->
+    <div class="player-area" id="bot-area">
+      <div class="player-header">
+        <span class="player-name">Bot</span>
+        <span class="player-coins">0 coins</span>
+      </div>
+      <div class="player-cards player-influence"></div>
+      <div class="player-cards player-revealed"></div>
+    </div>
+
+    <!-- Center -->
+    <div id="center">
+      <div id="game-log"></div>
+      <div id="phase-prompt" class="prompt"></div>
+    </div>
+
+    <!-- Human area -->
+    <div class="player-area" id="human-area">
+      <div class="player-header">
+        <span class="player-name">You</span>
+        <span class="player-coins">0 coins</span>
+      </div>
+      <div class="player-cards player-influence"></div>
+      <div class="player-cards player-revealed"></div>
+    </div>
+
+    <!-- Action buttons -->
+    <div id="action-buttons"></div>
+
+  </div>
+
+  <script src="/static/game.js"></script>
 </body>
 </html>
