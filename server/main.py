@@ -6,9 +6,11 @@ state_token string and sends it back on every move. The server never
 stores sessions.
 """
 
-from typing import Any, Dict, Optional
+import json
+from contextlib import asynccontextmanager
+from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -18,8 +20,15 @@ from engine.coup import (
     apply_action, is_terminal, legal_actions, new_game,
 )
 from server.bot import bot_move
+from server import storage
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    storage.init_db()
+    yield
+
+app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
@@ -42,6 +51,11 @@ class MoveRequest(BaseModel):
     move: Dict[str, Any]
 
 
+class SaveGameRequest(BaseModel):
+    snapshots: List[str]       # state_token strings; [0] = initial state
+    moves:     List[Dict[str, Any]]
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -50,18 +64,13 @@ def mask_state(state: GameState) -> Dict[str, Any]:
     """Return a display-safe dict: bot's face-down cards hidden, deck removed."""
     d = state.to_dict()
     del d["deck"]
-
-    # Hide bot's face-down influence
     d["players"][1]["influence"] = ["hidden"] * len(state.players[1].influence)
-
-    # Hide drawn cards only when the bot is doing the exchange
     if (
         d.get("pending")
         and d["pending"].get("drawn_cards") is not None
         and state.current_decision_player == 1
     ):
         d["pending"]["drawn_cards"] = ["hidden"] * len(state.pending.drawn_cards)
-
     return d
 
 
@@ -108,7 +117,7 @@ def build_response(state: GameState) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Endpoints
+# Game endpoints
 # ---------------------------------------------------------------------------
 
 @app.post("/api/new")
@@ -125,3 +134,33 @@ def api_move(req: MoveRequest):
     state = apply_action(state, move)
     state = run_bot_turns(state)
     return build_response(state)
+
+
+# ---------------------------------------------------------------------------
+# Storage endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/game/save")
+def api_save_game(req: SaveGameRequest):
+    if not req.snapshots:
+        raise HTTPException(status_code=400, detail="snapshots must not be empty")
+    final_state = GameState.from_json(req.snapshots[-1])
+    if not is_terminal(final_state):
+        raise HTTPException(status_code=400, detail="game is not over yet")
+    winner  = 0 if final_state.players[0].is_alive else 1
+    history = [h.to_dict() for h in final_state.history]
+    game_id = storage.save_game(winner, history, req.snapshots, req.moves)
+    return {"id": game_id}
+
+
+@app.get("/api/games")
+def api_list_games():
+    return storage.list_games()
+
+
+@app.get("/api/game/{game_id}")
+def api_get_game(game_id: int):
+    record = storage.get_game(game_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="game not found")
+    return record

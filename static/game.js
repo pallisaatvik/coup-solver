@@ -1,9 +1,12 @@
 'use strict';
 
-let stateToken   = null;
-let displayState = null;
-let legalMoves   = [];
-let lastLogLength = 0;
+let stateToken      = null;
+let displayState    = null;
+let legalMoves      = [];
+let lastLogLength   = 0;
+let snapshotHistory = [];
+let moveHistory     = [];
+let gameSaved       = false;
 
 const CARD_COLORS = {
   Duke:       '#7b5ea7',
@@ -24,6 +27,9 @@ async function startGame() {
     body:    JSON.stringify({ seed: null }),
   });
   const data = await res.json();
+  snapshotHistory = [data.state_token];
+  moveHistory     = [];
+  gameSaved       = false;
   applyResponse(data);
   document.getElementById('start-screen').style.display = 'none';
   document.getElementById('game-screen').style.display  = 'flex';
@@ -33,12 +39,14 @@ async function startGame() {
 
 async function submitMove(move) {
   setButtonsDisabled(true);
+  moveHistory.push(move);
   const res  = await fetch('/api/move', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify({ state_token: stateToken, move }),
   });
   const data = await res.json();
+  snapshotHistory.push(data.state_token);
   applyResponse(data);
   render();
 }
@@ -110,6 +118,7 @@ function renderPrompt(s) {
     const humanAlive = s.players[0].influence.length > 0;
     el.textContent = humanAlive ? 'You win!' : 'Bot wins!';
     el.className = humanAlive ? 'prompt win' : 'prompt lose';
+    saveGame();
     return;
   }
   el.className = 'prompt';
@@ -247,6 +256,16 @@ function moveLabel(move, s) {
     block:       `Block with ${move.block_card}`,
   };
   return labels[move.move_type] ?? move.move_type;
+}
+
+async function saveGame() {
+  if (gameSaved) return;
+  gameSaved = true;
+  await fetch('/api/game/save', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ snapshots: snapshotHistory, moves: moveHistory }),
+  });
 }
 
 // ---------------------------------------------------------------------------
