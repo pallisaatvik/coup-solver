@@ -37,11 +37,31 @@ Deliverable: `engine/coup.py` with `GameState`, `Action`, `apply_action()`, `leg
 
 Coup is a hidden-information extensive-form game, making it a good fit for **Counterfactual Regret Minimization (CFR)** — the same family of algorithms used for poker solvers.
 
+### Card visibility and information sets
+
+There are 3 copies of each card (15 total). Seeing any card narrows the distribution over the remaining hidden cards. Visibility has three tiers:
+
+- **Public** — lost influence (discard pile) + cards revealed during a successful challenge defence (shown to all before reshuffling)
+- **Private** — cards drawn during your own Ambassador Exchange (seen only by you, then returned to deck)
+- **Hidden** — opponent face-down cards + deck
+
+Each player therefore has a different information set even in the same game state. The formula for a given player:
+
+```
+hidden copies of X = 3 − hand.count(X) − public_revealed.count(X) − private_exchange_observations.count(X)
+```
+
+Implications for implementation:
+- The engine's `GameState` is the **ground truth** (referee view, all cards known)
+- Each player needs a **private observation log** — a persistent record of cards seen through their own Exchanges — to reconstruct their information set at any point
+- CFR must operate over per-player information sets, not the shared ground-truth state
+- The `GameState` already tracks `player.revealed` (public) and `pending.drawn_cards` (exchange draw, ephemeral); Phase 2 must persist Exchange observations per player across turns
+
 ### Training pipeline
 
 - Implement CFR (or CFR+) over the game tree
 - Self-play: bots play against copies of themselves, iteratively updating regret tables
-- Each player's strategy is a probability distribution over actions given their information set (what they can observe)
+- Each player's strategy is a probability distribution over actions given their **information set** (hand + public revealed + private Exchange history)
 - Run for enough iterations until strategies converge (Nash equilibrium approximation)
 - Save trained strategy to a file (`ai/strategy.json` or `.pkl`)
 
