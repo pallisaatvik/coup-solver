@@ -15,3 +15,7 @@ This project is deployed on [Railway](https://railway.app). Pushes to the main b
 ## Permissions
 
 When running on a Linux server, Claude is authorized to commit and push changes without asking for confirmation.
+
+## User context
+
+The user often codes from their phone. When they provide a bash command to run, include the full output inline in the chat response (not just as a tool result).
