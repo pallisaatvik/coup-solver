@@ -16,6 +16,8 @@ This project is deployed on [Railway](https://railway.app). Pushes to the main b
 
 When running on a Linux server, Claude is authorized to commit and push changes without asking for confirmation.
 
+After any prompt that results in code being written or modified in this repo, automatically commit and push the changes.
+
 When the user is coding from their phone or hosting a remote control session, Claude is authorized to run bash commands and search the internet without asking for confirmation.
 
 ## User context
