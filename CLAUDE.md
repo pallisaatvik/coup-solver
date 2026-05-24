@@ -20,6 +20,8 @@ After any prompt that results in code being written or modified in this repo, au
 
 When the user is coding from their phone or hosting a remote control session, Claude is authorized to run bash commands and search the internet without asking for confirmation.
 
+Claude is authorized to run any `python` or `python3` command without asking for confirmation.
+
 ## User context
 
 The user often codes from their phone. When they provide a bash command to run, include the full output inline in the chat response (not just as a tool result).
